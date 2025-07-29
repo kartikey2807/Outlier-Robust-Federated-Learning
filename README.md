@@ -1,4 +1,6 @@
 ## Plan
+
+* Can we work without gradient penalty
 * The best case plan is:-
   * client models can have WGAN + softmax for probability (SEPARATE) \[train on client side as well\]
   * we still get *critic(x|y)*
