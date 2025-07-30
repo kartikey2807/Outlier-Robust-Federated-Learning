@@ -7,8 +7,10 @@
     * does it work with stale loss?
     * what data is needed?
 * Can we work without gradient penalty
+  * GP has to go!
+  * then we can make client-server models
 * The best case plan is:-
-  * client models can have WGAN + softmax for probability (SEPARATE) \[train on client side as well\]
+  * client models can have WGAN + softmax for probability (SEPARATE) \[train on client side as well\] <-- can do this [crossentropy for 1 part, and wasserstein dist. for other]
   * we still get *critic(x|y)*
   * we collect a bunch of them (per class per sample)
   * aggregate them on server-side
