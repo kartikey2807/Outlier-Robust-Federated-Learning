@@ -1,29 +1,33 @@
-## Plan
-* What was suggested:-
-  * we train a bunch of client models
-  * aggregate the model weights
-  * that becomes discriminator
-  * Retrain the discriminator
-    * does it work with stale loss?
-    * what data is needed?
-* The best case plan is:-
-  * client models can have WGAN + softmax for probability
-  * we still get *critic(x|y)*
-  * we collect a bunch of them (per class per sample)
-  * aggregate them on server-side
-  * so *real_loss.mean()* is approximated
-  * pass the generated samples from *G*
-  * compute *fake_loss.mean()*
-  * train the critic model and generator model (plain wgan with clipping) <-- fail :X
-* UPDATE 2025-07-31
-  * cannot work without GP
-  * intense mode collapse
-  * no way around it
-  * let's keep a subset of real samples from some trusted clients
-  * try WGAN-GP
-  * If critic can use both Wasserstein objective and Cross-entropy loss, then this is great
+## Robust Federated Learning with WGAN-GP
+References: [Usama et al](https://doi.org/10.48550/arXiv.2503.20884)   
+**Federated Learning**   
+* collaborative training
+* between decentralized devices
+* no need to share raw data samples
+* updated weights are aggregated at a central server
+* averaged weights are sent back to the clients
+---
 
-`CLIENT x` --> 10%/5%/2%/1% images (x) and corresponding labels (y)    
-`SERVER` collects around 6000 of them (let's say)    
-Can make critic(fake,y) and critic(s,y) and  GRADIENT PENALTY TERM   
-Use 2 objectives `Cross entropy` on server level and `WGAN loss` on server level
+**Poison attacks**   
+* models are prone to poison attacks
+* model's weights can get altered
+* propagates to the global model
+* *un-targeted* attacks: degrades overall performance
+* *targeted* attacks: only targets certain classes
+---
+
+**Filter-based methods**   
+* filters out the malicious clients
+* use *Generator* from GANs
+* produce dummy data samples that mimic real data
+* measure client's accuracy on the dataset
+---
+
+**Improvements**
+* GANs suffer from mode collapse
+* do not produce diverse samples
+* In case of MNIST, they stuck with generating *blobs*
+* WGAN-GP generates better samples
+---
+
+**Note:** 0.5% of the samples are shared with the server model to compute gradient penalty and train the generator. It can be argued that this is negligible and can be ignored.
