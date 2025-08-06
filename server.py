@@ -32,8 +32,10 @@ class CustomDataset(Dataset):
 
 class Server():
     def __init__(self):
-        self.critic = Critic(INC,OUT,IMSIZE,LABEL,C_EMBEDDING).to(DEVICE)
-        self.gen = Generator(NOISE,CHN,LABEL,G_EMBEDDING).to(DEVICE)
+        self.critic = Critic(INC,OUT,IMSIZE,LABEL,C_EMBEDDING)
+        self.critic = self.critic.to(DEVICE)
+        self.gen = Generator(NOISE,CHN,LABEL,G_EMBEDDING)
+        self.gen = self.gen.to(DEVICE)
         ## beta (momentum) terms here are taken
         ## from the WGAN-GP paper. They seem to
         ## result in diverse samples They cause
