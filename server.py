@@ -26,6 +26,12 @@ class Server():
         self.gen = Generator(NOISE, CHN,LABEL,G_EMBEDDING).to(DEVICE)
         self.c_optim = Adam(self.critic.parameters(),LR,betas=(0.0,0.9)) ## from paper
         self.g_optim = Adam(self.gen.parameters(),LR,betas=(0.0,0.9))
+    def _initialize_critic(self,model_weights):
+        self.critic.load_state_dict(model_weights)
+    def _initialize_gen(self):
+        weight_initialization(self.gen)
+    def _get_critic_weights(self):
+        return self.critic.state_dict()
     def _train(self,x,y):
         dataset = CustomDataset(x,y)
         loader  = DataLoader(dataset, batch_size=BATCH_SIZE)
@@ -91,9 +97,3 @@ class Server():
             plt.set_cmap("gray")
             plt.axis("off")
             plt.show()
-    def _initialize_critic(self,model_weights):
-        self.critic.load_state_dict(model_weights)
-    def _initialize_gen(self):
-        weight_initialization(self.gen)
-    def _get_critic_weights(self):
-        return self.critic.state_dict()
