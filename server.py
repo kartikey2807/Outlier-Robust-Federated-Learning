@@ -1,8 +1,4 @@
-## WGAN-GP model... Create GENERATOR and CRITIC
-## Critic takes its weights from the aggregated
-## model and generator gets initialized. Try to
-## generate good and diverse samples, and  then
-## the process continues.
+#### SERVER SIDE ####
 import torch
 import torch.nn as nn
 from torch.utils.data import Dataset, DataLoader
@@ -18,13 +14,7 @@ class CustomDataset(Dataset):
     def __init__(self,x,y):
         self.x = x
         self.y = y
-        print(f"Sample size: {x.shape[0]}")
-        for k in range(10):
-            count = 0
-            for i in range(y.shape[0]):
-                if y[i] == k:
-                    count+=1
-            print(f"{k} -> {count}")
+        print(f"Sample len: {x.shape[0]}")
     def __len__(self):
         return self.x.shape[0]
     def __getitem__(self, index):
@@ -32,23 +22,10 @@ class CustomDataset(Dataset):
 
 class Server():
     def __init__(self):
-        self.critic = Critic(INC,OUT,IMSIZE,LABEL,C_EMBEDDING)
-        self.critic = self.critic.to(DEVICE)
-        self.gen = Generator(NOISE,CHN,LABEL,G_EMBEDDING)
-        self.gen = self.gen.to(DEVICE)
-        ## beta (momentum) terms here are taken
-        ## from the WGAN-GP paper. They seem to
-        ## result in diverse samples They cause
-        ## gradients to  move  smoothly without
-        ## jumping around.
-        self.c_optim = Adam(self.critic.parameters(),lr=LEARNING_RATE,betas=(0.0,0.9))
-        self.g_optim = Adam(self.gen.parameters(),lr=LEARNING_RATE,betas=(0.0,0.9))
-    def _initialize_critic(self,model_weights):
-        self.critic.load_state_dict(model_weights)
-    def _initialize_gen(self):
-        weight_initialization(self.gen)
-    def _get_critic_weights(self):
-        return self.critic.state_dict()
+        self.critic = Critic(OUT,IMSIZE,LABEL,C_EMBEDDING).to(DEVICE)
+        self.gen = Generator(NOISE, CHN,LABEL,G_EMBEDDING).to(DEVICE)
+        self.c_optim = Adam(self.critic.parameters(),LR,betas=(0.0,0.9)) ## from paper
+        self.g_optim = Adam(self.gen.parameters(),LR,betas=(0.0,0.9))
     def _train(self,x,y):
         dataset = CustomDataset(x,y)
         loader  = DataLoader(dataset, batch_size=BATCH_SIZE)
@@ -94,7 +71,9 @@ class Server():
                 continue
             self.gen.eval()
             self.critic.eval()
-            image,label = next(iter(loader))
+            r = int(torch.randint(0,200,(1,))[0])
+            image = x[r:r+BATCH_SIZE]
+            label = y[r:r+BATCH_SIZE]
             image = image.to(DEVICE)
             label = label.to(DEVICE)
             noise = torch.randn(image.shape[0],NOISE)
@@ -112,3 +91,9 @@ class Server():
             plt.set_cmap("gray")
             plt.axis("off")
             plt.show()
+    def _initialize_critic(self,model_weights):
+        self.critic.load_state_dict(model_weights)
+    def _initialize_gen(self):
+        weight_initialization(self.gen)
+    def _get_critic_weights(self):
+        return self.critic.state_dict()

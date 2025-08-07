@@ -1,7 +1,8 @@
-## It will be a regular WGAN generator inputs
-## noise and label pass through convtranspose
-## layers and then outputs a grayscale images
-## pixel values between -1 and 1.
+## It will be a regular WGAN generator that takes
+## in noise and labels, concatenates and reshapes
+## the feature map and adds conv-transpose layers
+## to output an image of 64x64, with pixel values
+## b/w 1 and -1
 
 import torch
 import torch.nn as nn
@@ -10,11 +11,6 @@ from torchsummary import summary
 class Generator(nn.Module):
     def __init__(self,noise:int,chn:list,label:int,embedding:int):
         super(Generator,self).__init__()
-
-        ## Pass through dense layers, reshape
-        ## and then pass through convtranspos
-        ## batchnorm-relu blocks. Last layers
-        ## will have torch.tanh() activations
         assert len(chn) == 4
         self.chn = chn
 
@@ -29,11 +25,9 @@ class Generator(nn.Module):
         self.embed = nn.Embedding(label,embedding)
     def _block(self,i,o,last=False):
         if last:
-            return nn.Sequential(nn.ConvTranspose2d(i,o,4,2,1),
-                                 nn.Tanh())
+            return nn.Sequential(nn.ConvTranspose2d(i,o,4,2,1),nn.Tanh())
         else:
-            return nn.Sequential(nn.ConvTranspose2d(i,o,4,2,1),nn.BatchNorm2d(o),
-                                 nn.ReLU())
+            return nn.Sequential(nn.ConvTranspose2d(i,o,4,2,1),nn.BatchNorm2d(o),nn.ReLU())
     def forward(self,z,y):
         input = torch.cat([z,self.embed(y)],dim=1)
         input = self.fc_01(input)

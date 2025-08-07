@@ -1,7 +1,4 @@
-## Need to create CLIENT_COUNT number of CLIENT
-## each client has # SAMPLES_PER_CLIENT of data
-## points. Assert that the product of these two
-## terms is 60_000 (total number of samples)
+#### HELPER FUNCTIONS ####
 import torch
 import torch.nn as nn
 import matplotlib.pyplot as plt
@@ -27,19 +24,15 @@ class MNISTDataset(Dataset):
         self.dataset.data = self.dataset.data[start:after]
         self.dataset.targets = self.dataset.targets[start:after]
     def __len__(self):
-        return len(self.dataset.data) ## = SAMPLES_PER_CLIENT
+        return len(self.dataset.data)## = SAMPLES_PER_CLIENT
     def __getitem__(self, index):
         image,label = self.dataset[index]
         return image,label
 
 def penalty(critic,real,fake,label,device):
     B,C,H,W = real.shape
-    ## add the real and fake image to create an
-    ## interpolated image. Compute gradient wrt
-    ## input images and force the gradient norm
-    ## to 1 Sample epsilon uniform distribution
     epsilon = torch.rand(B,1,1,1).repeat(1,C,H,W).to(device)
-    interpolated_image = (real*epsilon) + (fake*(1-epsilon)) ## combine real / fake
+    interpolated_image = (real*epsilon) + (fake*(1-epsilon))
     _, interpolated_score = critic(interpolated_image,label)
     gradient = torch.autograd.grad(
         outputs=interpolated_score,

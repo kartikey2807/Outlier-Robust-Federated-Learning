@@ -1,27 +1,23 @@
-## The model acts in 2 cases: With the client
-## it is a classifier(cross-entropy) and with
-## the server it is part of WGAN-GP loss. And
-## so we have two different inputs and output
+## The model acts in 2 cases: On the client side
+## it is classifier with cross-entropy loss, and
+## on the server-side, it is a Critic in WGAN-GP
+## And so we have two outputs: 10-dim logits for
+## softmax classification and 1 value for Critic
 
+from config import *
 import torch
 import torch.nn as nn
 from torchsummary import summary
 
 class Critic(nn.Module):
-    def __init__(self,inc:int,out:list,imsize:int,label:int,embedding:int):
+    def __init__(self,out:list,imsize:int,label:int,embedding:int):
         super(Critic,self).__init__()
-        ## The model inputs an image, applies
-        ## convolutions to it. At the end, we
-        ## apply 2 dense layers, one with ten
-        ## logits which is used in classifier
-        ## network, and then one with 1 logit
-        ## for wasserstein loss.
         assert embedding == imsize*imsize
         assert len(out) == 4
         self.imsize = imsize
 
         self.layer = nn.Sequential( ## conv-leakyrelu block
-            self._block(inc+1 ,out[0]), ## //2
+            self._block(INC+1 ,out[0]), ## //2
             self._block(out[0],out[1]), ## //4
             self._block(out[1],out[2]), ## //8
             self._block(out[2],out[3]), ## //16
