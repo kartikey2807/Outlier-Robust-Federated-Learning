@@ -31,7 +31,7 @@ References: [Usama et al](https://doi.org/10.48550/arXiv.2503.20884)
 ---
 
 **Observations**   
-In each communication round:-
+In each ***communication round***:-
 * *poisonous* clients get filtered out
 * *non-poisonous* clients' accuracy is same
 * Diverse set of images are obtained from Generator
