@@ -24,7 +24,12 @@ class Server():
     def __init__(self):
         self.critic = Critic(OUT,IMSIZE,LABEL,C_EMBEDDING).to(DEVICE)
         self.gen = Generator(NOISE, CHN,LABEL,G_EMBEDDING).to(DEVICE)
-        self.c_optim = Adam(self.critic.parameters(),LR,betas=(0.0,0.9)) ## from paper
+        ## Server side is a WGAN-GP model which
+        ## inputs the weights from clients into
+        ## the Critic, and re-trains the entire
+        ## again. Standalone generator produces
+        ## diverse and good images.
+        self.c_optim = Adam(self.critic.parameters(),LR,betas=(0.0,0.9)) ## WGAN paper
         self.g_optim = Adam(self.gen.parameters(),LR,betas=(0.0,0.9))
     def _initialize_critic(self,model_weights):
         self.critic.load_state_dict(model_weights)
@@ -77,10 +82,10 @@ class Server():
                 continue
             self.gen.eval()
             self.critic.eval()
-            r = int(torch.randint(0,200,(1,))[0])
-            image = x[r:r+BATCH_SIZE]
-            label = y[r:r+BATCH_SIZE]
+            rnd = int(torch.randint(0, 200, (1,))[0])
+            image = x[rnd:rnd+BATCH_SIZE]
             image = image.to(DEVICE)
+            label = y[rnd:rnd+BATCH_SIZE]
             label = label.to(DEVICE)
             noise = torch.randn(image.shape[0],NOISE)
             noise = noise.to(DEVICE)
