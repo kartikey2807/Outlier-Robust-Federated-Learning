@@ -49,6 +49,7 @@ class Client():
         ## define optimizer
         ## initialize weights
         ## create custom dataset
+        
         self.Dnet = Discriminator().to(DEVICE)
         self.Anet = Auxillary().to(DEVICE)
 
@@ -58,10 +59,8 @@ class Client():
         self.bcloss = BCELoss()
         self.celoss = CrossEntropyLoss()
 
-        self.Doptim = Adam(self.Dnet.parameters(),lr=LEARNING_RATE,
-                           betas=(0.5,0.999))
-        self.Aoptim = Adam(self.Anet.parameters(),lr=LEARNING_RATE,
-                           betas=(0.5,0.999))
+        self.Doptim = Adam(self.Dnet.parameters(),lr=LEARNING_RATE,betas=(0.5,0.999))
+        self.Aoptim = Adam(self.Anet.parameters(),lr=LEARNING_RATE,betas=(0.5,0.999))
 
         self.datasets = CustomMNIST(index).datasets
     
@@ -90,7 +89,7 @@ class Client():
         Dloss.backward()
 
         ## shares discriminator gradients
-        real_grad = [p.grad.clone() for p in self.Dnet.parameters()]
+        real_grad = [p.grad.clone()for p in self.Dnet.parameters()]
 
         if flag:
             preds = self.Anet(image)
