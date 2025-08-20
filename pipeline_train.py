@@ -20,9 +20,8 @@ def aggregate(weights):
         agg_weights[key] = torch.zeros_like(weights[0][key])
 
     for weight in weights:
-
+        
         for key in agg_weights:
-
             agg_weights[key] = agg_weights[key]+weight[key]
     
     for key in agg_weights:
