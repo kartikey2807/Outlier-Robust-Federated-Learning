@@ -6,7 +6,6 @@
 ## E[log[D(x|y)]] +  E[log[1-D(G(z|y)|y)]]
 ## E[log(D(G(z|y)|y))]
 
-
 import torch
 import torch.nn as nn
 from torchvision.transforms import transforms
