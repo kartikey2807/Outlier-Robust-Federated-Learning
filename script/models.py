@@ -88,5 +88,5 @@ class Auxillary(nn.Module):
 
 def weight_initialization(model):
     for m in model.modules():
-        if isinstance(m,(nn.Linear,nn.BatchNorm1d)):## 0 μ / 0.02 std
+        if isinstance(m,(nn.Linear,nn.BatchNorm1d)): ## 0 μ / 0.02 std
             nn.init.normal_(m.weight.data,0.0,0.02)
