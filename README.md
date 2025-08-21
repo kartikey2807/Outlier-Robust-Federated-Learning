@@ -1,4 +1,4 @@
-# Robust Federated Learning with conditional-GAN
+# Robust-Federated Learning with conditional-GAN
 
 **Federated Learning pipeline**   
 
