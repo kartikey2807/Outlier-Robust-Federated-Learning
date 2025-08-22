@@ -29,14 +29,14 @@ class Server():
 
         self.bcloss = BCELoss()
 
-        self.Goptim = Adam(self.Gnet.parameters(),lr=LEARNING_RATE,betas=(0.5,0.999))
-        self.Doptim = Adam(self.Dnet.parameters(),lr=LEARNING_RATE,betas=(0.5,0.999))
+        self.Goptim = Adam(self.Gnet.parameters(),LR,(0.500,0.999))
+        self.Doptim = Adam(self.Dnet.parameters(),LR,(0.500,0.999))
 
     def train(self,real_grads,label):
 
         self.Doptim.zero_grad()
 
-        for param, real_g in zip(self.Dnet.parameters(), real_grads):
+        for param, real_g in zip(self.Dnet.parameters(),real_grads):
             param.grad = real_g.to(DEVICE)
         
         noise = torch.randn(BATCH_SIZE,NOISE)

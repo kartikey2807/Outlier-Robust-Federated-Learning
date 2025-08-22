@@ -14,19 +14,8 @@ from server import *
 from clients import *
 
 def aggregate(weights):
-    agg_weights = {}
-
-    for key in weights[0].keys():
-        agg_weights[key] = torch.zeros_like(weights[0][key])
-
-    for weight in weights:
-        for key in agg_weights:
-            agg_weights[key] = agg_weights[key]+weight[key]
-    
-    for key in agg_weights:
-        agg_weights[key] /= float(len(weights)) ## averaged
-    
-    return agg_weights
+    num = len(weights)
+    return {k: sum(w[k] for w in weights)/num for k in weights[0].keys()}
 
 clients = []
 for i  in range(COUNT_CLIENT):
@@ -34,10 +23,7 @@ for i  in range(COUNT_CLIENT):
 
 server = Server()
 
-## Assume that initially we have one trusted
-## client. We train with that client for the
-## first round, get the generator and figure
-## out malicious clients.
+## Assume initially we have a trusted client
 
 print(f"Client: {0}")
 print("TRAINING")
@@ -49,8 +35,8 @@ for epoch in tqdm(range(EPOCH)):
     stable.Dnet.train()
     stable.Anet.train()
 
-    ## HOW MANY GRADIENT ARE SUFFIEICIENT TO
-    ## LEAK??
+    ## HOW MANY GRADIENTS ARE SUFFICIENT FOR
+    ## TO GENERATE 'Decent' SAMPLES>
 
     for i in range(300):
         stable.Dnet.load_state_dict(server.Dnet.state_dict()) ## same Θs
@@ -84,13 +70,9 @@ for _ in range(ROUNDS):
 
             print(f"Client: {index}")
             print("TRAINING")
-
-            ## Dnet <- attack, Anet <- ok <= ignore
-            ## Dnet <- ok, Anet <- attack
-            ## Both Dnet & Anet <- attack
-            
             client.Dnet.train()
             client.Anet.train()
+            
             for i in tqdm(range(300)):
                 client.train(i,True)
                 
@@ -118,6 +100,8 @@ for _ in range(ROUNDS):
     for index, client in enumerate(clients):
 
         if index not in malicious:
+            
+            client_weights.append(client.Anet.state_dict())
 
             print(f"Client: {index}")
             print("TRAINING")
@@ -132,10 +116,9 @@ for _ in range(ROUNDS):
                     client.Dnet.load_state_dict(server.Dnet.state_dict())
                     gradients_real,label = client.train(i,False)
                     server.train(gradients_real,label) ## server
-
+                    
             client.eval()
-            client_weights.append(client.Anet.state_dict())
-    
+
     agg_weights = aggregate(client_weights)
     print(len(client_weights))
     print("Load aggregate weights")
