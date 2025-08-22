@@ -9,10 +9,11 @@ import torch.nn as nn
 import matplotlib.pyplot as plt
 
 from torch.nn import CrossEntropyLoss, BCELoss
-from torch.optim import Adam
+from torch.optim import Adam,SGD
 from torchvision.transforms import transforms
 from torchvision.datasets import MNIST
 from torch.utils.data import Dataset,DataLoader
+from torch.nn.utils import clip_grad_norm_
 
 from tqdm import tqdm
 
@@ -28,7 +29,7 @@ class CustomMNIST(Dataset):
         
         assert index < COUNT_CLIENT ## index represent each client
 
-        self.datasets = MNIST(ROOT,True,transform)
+        self.datasets = MNIST(ROOT,True,transform,download=True)
         start = index*SAMPLES_PER_CLIENT
         final = start+SAMPLES_PER_CLIENT
 
@@ -59,8 +60,8 @@ class Client():
         self.bcloss = BCELoss()
         self.celoss = CrossEntropyLoss()
 
-        self.Doptim = Adam(self.Dnet.parameters(),lr=LEARNING_RATE,betas=(0.5,0.999))
-        self.Aoptim = Adam(self.Anet.parameters(),lr=LEARNING_RATE,betas=(0.5,0.999))
+        self.Doptim = Adam(self.Dnet.parameters(),LR,(0.500,0.999))
+        self.Aoptim = Adam(self.Anet.parameters(),LR,(0.500,0.999))
 
         self.datasets = CustomMNIST(index).datasets
     
@@ -72,24 +73,27 @@ class Client():
             image.append(self.datasets[i][0])
             label.append(self.datasets[i][1])
         
-        image = torch.stack (image)
-        label = torch.tensor(label)
+        image = torch.stack (image).to(DEVICE)
+        label = torch.tensor(label).to(DEVICE)
 
         self.Doptim.zero_grad()
         self.Aoptim.zero_grad()
 
-        image = image.to(DEVICE)
-        label = label.to(DEVICE)
-
         real_logit = self.Dnet(image,label)
-
-        ## Compute the loss over the real
-        ## logits and the 10-D prediction
+        
         Dloss = self.bcloss(real_logit,torch.ones_like(real_logit))
         Dloss.backward()
 
-        ## shares discriminator gradients
-        real_grad = [p.grad.clone()for p in self.Dnet.parameters()]
+        ## Drawback - By Law of Information
+        ## Recovery, aggregating grads many
+        ## times will reveal the real value
+        ## But we don't do that in the setup
+
+        real_grad = []
+        for param in self.Dnet.parameters():
+            g = param.grad.detach().clone()
+
+            real_grad.append(g)
 
         if flag:
             preds = self.Anet(image)
@@ -110,11 +114,8 @@ class Client():
             image.append(self.datasets[i][0])
             label.append(self.datasets[i][1])
         
-        image = torch.stack (image)
-        label = torch.tensor(label)
-
-        image = image.to(DEVICE)
-        label = label.to(DEVICE)
+        image = torch.stack (image).to(DEVICE)
+        label = torch.tensor(label).to(DEVICE)
         preds = self.Anet(image)
 
         accur = (torch.argmax(preds,dim=1)==label).sum()/BATCH_SIZE
