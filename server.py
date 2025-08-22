@@ -16,6 +16,7 @@ from config import *
 
 class Server():
     def __init__(self):
+
         ## define models
         ## define loss
         ## define optimizers
