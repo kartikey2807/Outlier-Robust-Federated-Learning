@@ -13,7 +13,6 @@ from torch.optim import Adam,SGD
 from torchvision.transforms import transforms
 from torchvision.datasets import MNIST
 from torch.utils.data import Dataset,DataLoader
-from torch.nn.utils import clip_grad_norm_
 
 from tqdm import tqdm
 
@@ -92,7 +91,6 @@ class Client():
         real_grad = []
         for param in self.Dnet.parameters():
             g = param.grad.detach().clone()
-
             real_grad.append(g)
 
         if flag:
