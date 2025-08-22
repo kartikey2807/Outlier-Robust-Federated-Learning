@@ -6,6 +6,7 @@
 import torch
 import torch.nn as nn
 import matplotlib.pyplot as plt
+from tqdm import tqdm
 
 from torchvision.utils import make_grid
 

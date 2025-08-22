@@ -1,4 +1,5 @@
 import torch
+import torch.nn as nn
 
 COUNT_CLIENT = 6
 SAMPLES_PER_CLIENT = 10000
