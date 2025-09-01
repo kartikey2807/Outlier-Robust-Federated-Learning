@@ -1,18 +1,20 @@
-## Federated learning pipeline: train client
-## server models The Discriminator models on
-## both side will have same weight and train
-## Auxilllary model once in each epoch.
+## Outlier-robust Federated Learning setup: For
+## each batch sample client grads and implement
+## KRUM. You will have a trusted gradient, with
+## high probability of being benign. Train with
+## the server side and update the GAN models.
+
+from config import *
 
 import torch
 import torch.nn as nn
 import matplotlib.pyplot as plt
+
 from tqdm import tqdm
 
 from torchvision.utils import make_grid
-
-from config import *
-from server import *
-from clients import *
+from clients import Client
+from server  import Server
 
 def aggregate(weights):
     num = len(weights)
@@ -24,104 +26,129 @@ for i  in range(COUNT_CLIENT):
 
 server = Server()
 
-## Assume initially we have a trusted client
-
-print(f"Client: {0}")
-print("TRAINING")
-stable = clients[0]
-
-for epoch in tqdm(range(EPOCH)):
-    server.Dnet.train()
-    server.Gnet.train()
-    stable.Dnet.train()
-    stable.Anet.train()
-
-    ## HOW MANY GRADIENTS ARE SUFFICIENT FOR
-    ## TO GENERATE 'Decent' SAMPLES>
-
-    for i in range(300):
-        stable.Dnet.load_state_dict(server.Dnet.state_dict()) ## same Θs
-        gradients_real,label = stable.train(i,False)
-        server.train(gradients_real,label) ## server
-
-stable.eval()
 for _ in range(ROUNDS):
 
-    ## Generate fake samples
+    num = torch.randint(1,MAX_BYZANTINE+1,(1,)).item()
+    byzantine = torch.randperm(COUNT_CLIENT)[:num]
+
+    print("CLIENT CLASSIFIER TRAINED")
+    for j,client in enumerate(clients):
+
+        if j in byzantine:
+            client.weight_attack()
+            print(f"Client @ {j}")
+            print("POISONED")
+        
+        else:
+            
+            print(f"Client @ {j}")
+            print("TRAINING")
+
+            client.Anet.train()
+            client.Dnet.train()
+            for i in range(300):
+
+                client.train(i,flag=True)
+            
+            client.eval()
+
+    print("DISCRIMINATOR TRAINING")
+    for epoch in tqdm(range(EPOCH)):
+
+        for i in range(300):
+            
+            batch_grads = []
+            batch_label = []
+
+            for j,client in enumerate(clients):
+                
+                real_grad = None
+                label = None
+
+                if j not in byzantine:
+
+                    server.Dnet.train()
+                    server.Gnet.train()
+                    client.Dnet.train()
+                    client.Anet.train()
+
+                    client.Dnet.load_state_dict(server.Dnet.state_dict())
+                    real_grad,label = client.train(i)
+                else:
+
+                    client.train(i)
+                    real_grad,label = client.gradient_attack()
+                
+                batch_grads.append(real_grad)
+                batch_label.append(label)         
+            
+            ## IMPLEMENT KRUM aggregation part
+            ## where the goal is to select the
+            ## most similar client of majority
+            ## Expected to filter "Byzanitine"
+            ## clients.
+
+            dist = torch.zeros(COUNT_CLIENT,COUNT_CLIENT)
+
+            for c1 in range(COUNT_CLIENT):
+
+                for c2 in range(COUNT_CLIENT):
+
+                    if c1 != c2:
+                        for d1,d2 in zip(batch_grads[c1],batch_grads[c2]):
+                            dist[c1,c2] = (d1-d2).norm(p=2)
+                            dist[c2,c1] = (d1-d2).norm(p=2)
+            score = []
+            for cx in range(COUNT_CLIENT):
+
+                sort_dist = torch.sort(dist[cx,:])
+                score.append(torch.sum(sort_dist[0][: closest_neighbor]))
+            
+            score = torch.tensor(score)
+            trust = torch.argmin(score)
+
+            server.train(
+                batch_grads[trust],
+                batch_label[trust]
+            )
     
+    print("GENERATED MNIST OUTPUT")
+    
+    ## Sample gaussian noise and generate fake
+    ## image. Plot the mnist images and use it
+    ## to filter out all the malicious clients
+    ## Aggregate the benign weights and shares
+    ## with all the clients.
+
     sample = 64
-    print("------- Generator O/P --------")
     noise = torch.randn(sample,NOISE)
     label = torch.randint(0,10,(64,))
 
     noise = noise.to(DEVICE)
     label = label.to(DEVICE)
-    fakes = server.Gnet(noise,label)
-
-    print(label)
-
-    plt.imshow(make_grid(fakes).permute(1,2,0).detach().numpy()*0.5+0.5)
-    plt.set_cmap("gray")
-    plt.axis("off")
-    plt.show()
-
-    for index, client in enumerate(clients):
-
-        if torch.bernoulli(PROBABILITY)== 1:
-
-            print(f"Client: {index}")
-            print("TRAINING")
-            client.Dnet.train()
-            client.Anet.train()
-            
-            for i in tqdm(range(300)):
-                client.train(i,True)
-                
-        else:
-            print(f"Client: {index}")
-            print("POISONED")
-            client.weight_attack()
-    
-        client.eval()
+    fakes = server.Gnet(noise, label)
     
     malicious = []
-    for index, client in enumerate(clients):
+
+    for j,client in enumerate(clients):
+        
         client.Anet.eval()
+        preds = \
+        client.Anet(fakes)
 
-        preds = client.Anet(fakes)
         accuracy = (torch.argmax(preds,dim=1)==label).sum()/float(sample)
-
         if accuracy < THRESHOLD:
-            print(f"Poisoned client index {index}")
-            print(f"Accuracy: {accuracy*100:.2f}%")
-            malicious.append(index)
+            malicious.append(j)
+    
+    print("MALICIOUS CLIENTS")
+    print(malicious)
 
-    client_weights = []
-    print("-------- RE-TRAINING ---------")
-    for index, client in enumerate(clients):
+    print("FEDERATED AVERAGE")
+    
+    weights = [client.Anet.state_dict() for j,client in enumerate(clients) if j not in malicious]
+    average = aggregate(weights)
 
-        if index not in malicious:
-            
-            client_weights.append(client.Anet.state_dict())
-
-            print(f"Client: {index}")
-            print("TRAINING")
-
-            for epoch in tqdm(range(EPOCH)):
-                server.Dnet.train()
-                server.Gnet.train()
-                client.Dnet.train()
-                client.Anet.train()
-
-                for i in range(300):
-                    client.Dnet.load_state_dict(server.Dnet.state_dict())
-                    gradients_real,label = client.train(i,False)
-                    server.train(gradients_real,label) ## server
-                    
-            client.eval()
-
-    agg_weights = aggregate(client_weights)
-    print(len(client_weights))
-    print("Load aggregate weights")
+    ## Load back the aggregated weights back
+    ## to each client. (malicious or benign)
     for client in clients:
-        client.Anet.load_state_dict(agg_weights)
+        client.Anet.load_state_dict(average)

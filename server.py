@@ -1,7 +1,11 @@
-## Server receives discriminator gradient
-## and batch labels. No real samples have
-## leaked to server's side and  generator
-## still gets trained.
+## Server receives real discriminator gradients
+## and labels. No real image are leaked. Server
+## computes fake disc loss log[1-D(G(z|y))] and
+## Generator loss log[D(G(z|y))]. Model updates
+## happen here
+
+from script.models import *
+from config import *
 
 import torch
 import torch.nn as nn
@@ -9,10 +13,6 @@ import matplotlib.pyplot as plt
 
 from torch.optim import Adam
 from torch.nn import BCELoss
-from tqdm import tqdm
-
-from script.models import *
-from config import *
 
 class Server():
     def __init__(self):
@@ -30,8 +30,14 @@ class Server():
 
         self.bcloss = BCELoss()
 
-        self.Goptim = Adam(self.Gnet.parameters(),LR,(0.500,0.999))
-        self.Doptim = Adam(self.Dnet.parameters(),LR,(0.500,0.999))
+        self.Goptim = Adam(
+                      self.Gnet.parameters(),
+                      LEARNING_RATE,
+                      (0.500,0.999))
+        self.Doptim = Adam(
+                      self.Dnet.parameters(),
+                      LEARNING_RATE,
+                      (0.500,0.999))
 
     def train(self,real_grads,label):
 
