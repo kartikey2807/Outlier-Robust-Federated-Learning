@@ -30,14 +30,10 @@ class Server():
 
         self.bcloss = BCELoss()
 
-        self.Goptim = Adam(
-                      self.Gnet.parameters(),
-                      LEARNING_RATE,
-                      (0.500,0.999))
-        self.Doptim = Adam(
-                      self.Dnet.parameters(),
-                      LEARNING_RATE,
-                      (0.500,0.999))
+        self.Goptim = Adam(self.Gnet.parameters(),
+                      LEARNING_RATE,(0.50,0.999))
+        self.Doptim = Adam(self.Dnet.parameters(),
+                      LEARNING_RATE,(0.50,0.999))
 
     def train(self,real_grads,label):
 

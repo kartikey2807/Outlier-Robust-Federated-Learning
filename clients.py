@@ -61,14 +61,10 @@ class Client():
         self.bcloss = BCELoss()
         self.celoss = CrossEntropyLoss()
 
-        self.Doptim = Adam(
-                      self.Dnet.parameters(),
-                      LEARNING_RATE,
-                      (0.500,0.999))
-        self.Aoptim = Adam(
-                      self.Anet.parameters(),
-                      LEARNING_RATE,
-                      (0.500,0.999))
+        self.Doptim = Adam(self.Dnet.parameters(),
+                      LEARNING_RATE,(0.50,0.999))
+        self.Aoptim = Adam(self.Anet.parameters(),
+                      LEARNING_RATE,(0.50,0.999))
 
         self.datasets = CustomMNIST(index) ## transformed image and label
         self.STD = 1.2
@@ -117,7 +113,7 @@ class Client():
         
         image = []
         label = []
-        for i in range(start, start + BATCH_SIZE):
+        for i in range(start*BATCH_SIZE,(start+1)*BATCH_SIZE):
             image.append(self.datasets.images[i])
             label.append(self.datasets.labels[i])
         
