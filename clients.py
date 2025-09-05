@@ -115,7 +115,7 @@ class Client():
             probs = []
 
             x = np.exp(EPSILON)
-            
+
             for num in range(LABEL):
                 if num == l:
                     probs.append(x/(x+LABEL-1))
