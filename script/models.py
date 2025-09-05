@@ -29,7 +29,7 @@ class Generator(nn.Module):
     def forward(self,z,y):
         y_embed = self.embed(y)
 
-        input = torch.cat([self.fc1_1(z),self.fc1_2(y_embed)],dim=1)
+        input = torch.cat([self.fc1_1(z),self.fc1_2(y_embed)],dim = 1)
         input = self.fc2_1(input)
         input = self.fc3_1(input)
         input = self.fc4_1(input)
@@ -43,7 +43,7 @@ class Discriminator(nn.Module):
 
         self.fc1_1 = self.linear(784,1024)
         self.fc1_2 = self.linear(10, 1024)
-        self.fc2_1 = self.linear(2048,512)
+        self.fc2_1 = self.linear(1024,512)
         self.fc3_1 = self.linear(512, 256)
         self.fc4_1 = nn.Sequential(nn.Linear(256,1),
                      nn.Sigmoid())
@@ -54,11 +54,12 @@ class Discriminator(nn.Module):
         return nn.Sequential(nn.Linear(i,o),
                nn.LeakyReLU(0.2))
 
-    def forward(self,x,y):
-        y_embed = self.embed(y)
+    def forward(self,x):
+        # y_embed = self.embed(y)
         x = x.view(-1,784)
 
-        input = torch.cat([self.fc1_1(x),self.fc1_2(y_embed)],dim=1)
+        # input = torch.cat([self.fc1_1(x),self.fc1_2(y_embed)],dim=1)
+        input = self.fc1_1(x)
         input = self.fc2_1(input)
         input = self.fc3_1(input)
         input = self.fc4_1(input)

@@ -84,7 +84,7 @@ class Client():
         self.Doptim.zero_grad()
         self.Aoptim.zero_grad()
 
-        real_logit = self.Dnet(image,label)
+        real_logit = self.Dnet(image)
         
         Dloss = self.bcloss(
                 real_logit,
@@ -117,6 +117,7 @@ class Client():
             x = np.exp(EPSILON)
 
             for num in range(LABEL):
+              
                 if num == l:
                     probs.append(x/(x+LABEL-1))
                 else:

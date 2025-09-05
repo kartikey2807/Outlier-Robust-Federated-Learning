@@ -47,7 +47,7 @@ class Server():
         label = label.to(DEVICE)
 
         fakes = self.Gnet(noise,label)
-        fake_logit = self.Dnet(fakes,label)
+        fake_logit = self.Dnet(fakes)
 
         ## log[1-D(G(z|y))]
         Dloss = self.bcloss(fake_logit,torch.zeros_like(fake_logit))
@@ -56,10 +56,11 @@ class Server():
         self.Doptim.step()
 
         self.Goptim.zero_grad()
-        fake_logit = self.Dnet(fakes,label)
+        fake_logit = self.Dnet(fakes)
 
         ## log[D(G(z|y))]
         Gloss = self.bcloss(fake_logit,torch.ones_like (fake_logit))
+        ## here cross-entropy loss
         Gloss.backward()
         
         self.Goptim.step()
