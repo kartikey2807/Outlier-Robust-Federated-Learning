@@ -105,22 +105,27 @@ class Client():
             Aloss.backward()
             self.Aoptim.step()
 
-        ## differential private label flipping
+        ## Label Flipping with an ε differential
+        ## privacy. On reverse-engineering, user
+        ## cannot say with 100% certainty if the
+        ## label is true or not. (i.e., flipped)
         flipped_label = []
 
         for l in label:
             probs = []
-            
+
             x = np.exp(EPSILON)
-            
-            for i in range(LABEL):
-                if i == l:
+
+            for num in range(LABEL):
+              
+                if num == l:
                     probs.append(x/(x+LABEL-1))
                 else:
                     probs.append(1/(x+LABEL-1))
             
             flipped_label.append(
-            np.random.choice(np.arange(LABEL),1,p= probs)[0])
+                np.random.choice(
+                np.arange(LABEL),1,p=probs)[0])
             
         return real_grad,torch.tensor(flipped_label)
     
