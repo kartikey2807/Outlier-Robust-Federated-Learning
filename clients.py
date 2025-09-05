@@ -159,7 +159,3 @@ class Client():
                 posionous_grads.append(param.grad.detach().clone())
         
         return posionous_grads,torch.tensor([])
-
-
-client = Client(0)
-client.train(0,False)
