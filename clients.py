@@ -7,6 +7,7 @@
 from script.models import *
 from config import *
 
+import numpy as np
 import torch
 import torch.nn as nn
 import matplotlib.pyplot as plt
@@ -104,7 +105,28 @@ class Client():
             Aloss.backward()
             self.Aoptim.step()
 
-        return real_grad,label
+        ## Label Flipping with an ε differential
+        ## privacy. On reverse-engineering, user
+        ## cannot say with 100% certainty if the
+        ## label is true or not. (i.e., flipped)
+        flipped_label = []
+
+        for l in label:
+            probs = []
+
+            x = np.exp(EPSILON)
+            
+            for num in range(LABEL):
+                if num == l:
+                    probs.append(x/(x+LABEL-1))
+                else:
+                    probs.append(1/(x+LABEL-1))
+            
+            flipped_label.append(
+                np.random.choice(
+                np.arange(LABEL),1,p=probs)[0])
+            
+        return real_grad,torch.tensor(flipped_label)
     
     def eval(self):
         
