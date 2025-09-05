@@ -7,6 +7,7 @@
 from script.models import *
 from config import *
 
+import numpy as np
 import torch
 import torch.nn as nn
 import matplotlib.pyplot as plt
@@ -83,7 +84,7 @@ class Client():
         self.Doptim.zero_grad()
         self.Aoptim.zero_grad()
 
-        real_logit = self.Dnet(image,label)
+        real_logit = self.Dnet(image)
         
         Dloss = self.bcloss(
                 real_logit,
@@ -104,7 +105,24 @@ class Client():
             Aloss.backward()
             self.Aoptim.step()
 
-        return real_grad,label
+        ## differential private label flipping
+        flipped_label = []
+
+        for l in label:
+            probs = []
+            
+            x = np.exp(EPSILON)
+            
+            for i in range(LABEL):
+                if i == l:
+                    probs.append(x/(x+LABEL-1))
+                else:
+                    probs.append(1/(x+LABEL-1))
+            
+            flipped_label.append(
+            np.random.choice(np.arange(LABEL),1,p= probs)[0])
+            
+        return real_grad,torch.tensor(flipped_label)
     
     def eval(self):
         
@@ -141,3 +159,7 @@ class Client():
                 posionous_grads.append(param.grad.detach().clone())
         
         return posionous_grads,torch.tensor([])
+
+
+client = Client(0)
+client.train(0,False)
