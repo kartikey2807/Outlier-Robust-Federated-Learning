@@ -144,8 +144,11 @@ for _ in range(ROUNDS):
     print(malicious)
 
     print("FEDERATED AVERAGE")
-    
-    weights = [client.Anet.state_dict() for j,client in enumerate(clients) if j not in malicious]
+
+    weights = []
+    for j,client in enumerate(clients):
+        if j not in malicious:
+            weights.append(client.Anet.state_dict())
     average = aggregate(weights)
 
     ## Load back the aggregated weights back
