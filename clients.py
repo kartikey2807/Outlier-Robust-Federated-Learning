@@ -2,7 +2,7 @@
 ## phases: one computes the real component for
 ## Discriminator loss log[D(x|y)] and the next
 ## computes the cross-entropy loss -clog[h(x)]
-## We share gradients and labels to the server
+## UPDATE: WE DON'T SHARE GRAD WITH THE SERVER
 
 from script.models import *
 from config import *
@@ -12,7 +12,7 @@ import torch
 import torch.nn as nn
 import matplotlib.pyplot as plt
 
-from torch.nn import CrossEntropyLoss, BCELoss
+from torch.nn import CrossEntropyLoss,BCELoss
 from torch.optim import Adam,SGD
 from torchvision.transforms import transforms
 from torchvision.datasets import MNIST
@@ -93,41 +93,18 @@ class Client():
         
         Dloss.backward()
 
-        real_grad = []
+        real_gradients = []
         for param in self.Dnet.parameters():
             p = param.grad.detach().clone()
-
-            real_grad.append(p)
+            real_gradients.append(p)
 
         if flag:
             preds = self.Anet(image)
             Aloss = self.celoss(preds,label)
             Aloss.backward()
             self.Aoptim.step()
-
-        ## Label Flipping with an ε differential
-        ## privacy. On reverse-engineering, user
-        ## cannot say with 100% certainty if the
-        ## label is true or not. (i.e., flipped)
-        flipped_label = []
-
-        for l in label:
-            probs = []
-
-            x = np.exp(EPSILON)
-
-            for num in range(LABEL):
-              
-                if num == l:
-                    probs.append(x/(x+LABEL-1))
-                else:
-                    probs.append(1/(x+LABEL-1))
-            
-            flipped_label.append(
-                np.random.choice(
-                np.arange(LABEL),1,p=probs)[0])
-            
-        return real_grad,torch.tensor(flipped_label)
+        
+        return real_gradients ## NO LABELS SHARED
     
     def eval(self):
         
@@ -163,4 +140,4 @@ class Client():
                 param.grad = torch.randn_like(param.grad)* self.STD
                 posionous_grads.append(param.grad.detach().clone())
         
-        return posionous_grads,torch.tensor([])
+        return posionous_grads

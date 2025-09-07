@@ -13,5 +13,4 @@ LEARNING_RATE = 0.0002
 LABEL = 10
 EPOCH = 100
 EPSILON = 4
-closest_neighbor = COUNT_CLIENT - MAX_BYZANTINE
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
