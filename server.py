@@ -57,21 +57,15 @@ class Server():
         fakes = self.Gnet(noise,label)
         fake_logit = self.Dnet(fakes)
 
-        Dloss = self.bcloss(
-            fake_logit,
-            torch.zeros_like(fake_logit)
-            )
+        Dloss = self.bcloss(fake_logit,torch.zeros_like(fake_logit))
 
-        Dloss.backward(retain_graph = True)
+        Dloss.backward(retain_graph=True)
         self.Doptim.step()
 
         fake_logit = self.Dnet(fakes)
 
-        Gloss = self.bcloss(
-            fake_logit,
-            torch.ones_like(fake_logit)
-            ) + \
-            self.celoss(classifier(fakes),label)
-        Gloss.backward()
-
+        Gloss = self.bcloss(fake_logit,torch.ones_like (fake_logit)) + \
+                self.celoss(classifier(fakes),label)
+        
+        Gloss.backward(retain_graph=True)
         self.Goptim.step()
