@@ -89,6 +89,7 @@ for _ in range(ROUNDS):
             ## clients.
 
             dist = torch.zeros(COUNT_CLIENT,COUNT_CLIENT)
+            dist = dist.to(DEVICE)
 
             for c1 in range(COUNT_CLIENT):
 
@@ -96,8 +97,9 @@ for _ in range(ROUNDS):
 
                     if c1 != c2:
                         for d1,d2 in zip(batch_grads[c1],batch_grads[c2]):
-                            dist[c1,c2] = (d1-d2).norm(p=2)
-                            dist[c2,c1] = (d1-d2).norm(p=2)
+                            ## add norms
+                            dist[c1,c2] += (d1-d2).norm(p=2)
+                            dist[c2,c1] += (d1-d2).norm(p=2)
             score = []
             for cx in range(COUNT_CLIENT):
 
@@ -144,7 +146,7 @@ for _ in range(ROUNDS):
     print(malicious)
 
     print("FEDERATED AVERAGE")
-
+    
     weights = []
     for j,client in enumerate(clients):
         if j not in malicious:
