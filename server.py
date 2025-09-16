@@ -8,6 +8,7 @@
 
 from script.models import *
 from config import *
+from clients import transform
 
 import numpy as np
 import torch
@@ -16,6 +17,10 @@ import matplotlib.pyplot as plt
 
 from torch.optim import Adam
 from torch.nn import BCELoss, CrossEntropyLoss
+
+from torchvision.datasets import MNIST
+from torch.utils.data import DataLoader
+from torchvision.transforms import transforms
 
 class Server():
     def __init__(self):
@@ -38,6 +43,13 @@ class Server():
                       LEARNING_RATE,(0.50,0.999))
         self.Doptim = Adam(self.Dnet.parameters(),
                       LEARNING_RATE,(0.50,0.999))
+        
+        self.datasets = MNIST("MNIST/dataset",
+                             train=False,
+                             transform=transform,
+                             download=True)
+        
+        self.dataload = DataLoader(self.datasets,10000)
 
     def train(self,real_gradients,classifier):
 
@@ -69,3 +81,15 @@ class Server():
         
         Gloss.backward(retain_graph=True)
         self.Goptim.step()
+    
+    def test_global_classifier(self,classifier):
+        
+        classifier.eval()
+        image,label = next(iter(self.dataload))
+
+        image = image.to(DEVICE)
+        label = label.to(DEVICE)
+        preds = classifier(image,label)
+
+        accuracy = (torch.argmax(preds,dim=1)==label).sum() / 10_000
+        print(f"Global model accuracy: {accuracy*100:.2f}%")

@@ -66,8 +66,11 @@ for _ in range(ROUNDS):
     label = label.to(DEVICE)
     fakes = server.Gnet(noise, label)
 
-    num = torch.randint(1,MAX_BYZANTINE+1,(1,)).item()
-    byzantine = torch.randperm(COUNT_CLIENT)[:num]
+    byzantine = []
+
+    if MAX_BYZANTINE != 0:
+        num = torch.randint(1,MAX_BYZANTINE+1,(1,)).item()
+        byzantine = torch.randperm(COUNT_CLIENT)[:num]
 
     for j,client in enumerate(clients):
 
@@ -116,6 +119,8 @@ for _ in range(ROUNDS):
     ## This is applied to : malicious and benign
     for client in clients:
         client.Anet.load_state_dict(avg_weights)
+    
+    server.test_global_classifier(clients[0].Anet)
 
     for epoch in tqdm(range(EPOCH)):
 
