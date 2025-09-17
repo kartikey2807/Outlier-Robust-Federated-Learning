@@ -89,7 +89,7 @@ class Server():
 
         image = image.to(DEVICE)
         label = label.to(DEVICE)
-        preds = classifier(image,label)
+        preds = classifier(image)
 
         accuracy = (torch.argmax(preds,dim=1)==label).sum() / 10_000
         print(f"Global model accuracy: {accuracy*100:.2f}%")
