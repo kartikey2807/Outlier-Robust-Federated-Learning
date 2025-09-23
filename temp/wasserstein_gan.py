@@ -143,9 +143,9 @@ for epoch in range(EPOCHS): ## train for each epoch
             Closs.backward(retain_graph=True)
             Coptim.step()
         
-        ## weight clipping
-        for param in Cnet.parameters():
-            param.data.clamp_(-W_CLIP,W_CLIP)
+            ## weight clipping
+            for param in Cnet.parameters():
+                param.data.clamp_(-W_CLIP,W_CLIP)
 
         Goptim.zero_grad()
         Gloss = -torch.mean(Cnet(fakes)) ## f(G(z|y))
