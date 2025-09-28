@@ -36,8 +36,11 @@ def krum(gradient):
     
     score = []
     for c3 in range(COUNT_CLIENT):
-        dist = torch.sort(dist_mat[c3,:])[0]
-        score.append(torch.sum(dist[:COUNT_CLIENT-MAX_BYZANTINE]))
+        sorted_dists = torch.sort(dist_mat[c3,:])[0]
+        samples = COUNT_CLIENT-MAX_BYZANTINE
+        score.append(
+            torch.sum(sorted_dists[:samples])
+        )
     
     return torch.tensor(score)
 
@@ -49,20 +52,19 @@ for i in  range(COUNT_CLIENT):
 
 stable = clients[0]
 stable.Anet.train()
-for i in range(75):
+for i in range(150):
     stable.train(i,True)
 
 for epoch in tqdm(range(EPOCH)):
     server.Dnet.train()
     server.Gnet.train()
     stable.Dnet.train()
-    for i in range(75):
+    for i in range(150):
 
         for _ in range(CRITIC_ITER):
 
             stable.Dnet.load_state_dict(server.Dnet.state_dict())
             real_grad = stable.train(i)
-            
             server.train(stable.Anet,
                 real_grad,flag=False
             )
@@ -97,7 +99,7 @@ for _ in range(ROUNDS):
             print("TRAINING")
 
             client.Anet.train()
-            for i in range(75):
+            for i in range(150):
                 client.train(i,True)
         
             accuracy = client.eval()
@@ -131,8 +133,7 @@ for _ in range(ROUNDS):
     for epoch in tqdm(range(EPOCH)):
         server.Dnet.train()
         server.Gnet.train()
-
-        for i in range(75):
+        for i in range(150):
 
             ## For each batch, get the
             ## gradients from from all
