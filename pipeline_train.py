@@ -50,14 +50,14 @@ for i in  range(COUNT_CLIENT):
 
 stable = clients[0]
 stable.Anet.train()
-for i in range(150):
+for i in range(75):
     stable.train(i,True)
 
 for epoch in tqdm(range(EPOCH)):
     server.Dnet.train()
     server.Gnet.train()
     stable.Dnet.train()
-    for i in range(150):
+    for i in range(75):
 
         for _ in range(CRITIC_ITER):
 
@@ -74,7 +74,7 @@ for _ in range(ROUNDS):
 
     weights = []
 
-    noise = torch.randn(BATCH_SIZE,100)
+    noise = torch.randn(64,100)
     label = torch.randint(0,10,(64,))
     
     noise = noise.to(DEVICE)
@@ -98,7 +98,7 @@ for _ in range(ROUNDS):
             print("TRAINING")
 
             client.Anet.train()
-            for i in range(150):
+            for i in range(75):
                 client.train(i,True)
         
             accuracy = client.eval()
@@ -117,7 +117,6 @@ for _ in range(ROUNDS):
 
         else:
             benign = j
-            
             weights.append(
                 client.Anet.state_dict()
             )
@@ -134,7 +133,7 @@ for _ in range(ROUNDS):
         server.Dnet.train()
         server.Gnet.train()
 
-        for i in range(150):
+        for i in range(75):
 
             ## For each batch, get the
             ## gradients from from all
