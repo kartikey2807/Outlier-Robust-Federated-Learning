@@ -78,6 +78,8 @@ class Generator(nn.Module):
         self.conv1 = self.blocks(64,32)
         self.conv2 = self.blocks(32,16)
         self.conv3 = self.blocks(16,IN,last=True)
+
+        self.dropout = nn.Dropout(p=0.3)
     
     def blocks(self,i,o,last=False):
         if last:
@@ -93,6 +95,7 @@ class Generator(nn.Module):
 
         input = torch.cat([noise,self.embed(label)],dim=1)
         input = self.fc1_1(input)
+        input = self.dropout(input)
         
         input = input.view(-1,64,4,4)
         input = self.conv1(input)
