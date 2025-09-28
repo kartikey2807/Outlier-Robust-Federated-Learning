@@ -1,8 +1,9 @@
-## We work batch-by-batch. Client works is two
-## phases: one computes the real component for
-## Discriminator loss log[D(x|y)] and the next
-## computes the cross-entropy loss -clog[h(x)]
-## UPDATE: WE DON'T SHARE GRAD WITH THE SERVER
+## We work batch-by-batch. Client has two models
+## First is Critic f(x), and other is classifier
+## H(x). Critic shares the gradients of the real
+## loss with the server side. Classifier trained
+## with cross-entropy loss -c.log[H(x)]. DP will
+## get applied to discriminator first.
 
 from script.models import *
 from config import *
@@ -12,132 +13,150 @@ import torch
 import torch.nn as nn
 import matplotlib.pyplot as plt
 
-from torch.nn import CrossEntropyLoss,BCELoss
-from torch.optim import Adam,SGD
 from torchvision.transforms import transforms
 from torchvision.datasets import MNIST
-from torch.utils.data import Dataset,DataLoader
+from torch.nn import CrossEntropyLoss
+from torch.utils.data import Dataset
+from torch.optim import RMSprop,Adam
 
 transform = transforms.Compose([
+    transforms.Resize((32,32)),
     transforms.ToTensor(),
-    transforms.Normalize([0.5],[0.5])])
+    transforms.Normalize([0.5],[0.5])
+])
 
-class CustomMNIST(Dataset):
+datasets = MNIST(
+    ROOT,
+    train=True,
+    transform=transform,
+    download=True
+)
+
+class CustomMNISTDataset(Dataset):
 
     def __init__(self,index):
+        '''
+        index: partitions global
+        dataset and assigns each
+        chunk to one client. All
+        chunks are idependent of
+        each other.
+        '''
 
-        self.dataset = MNIST(ROOT,True,transform=transform,download=True)
-        start = index*SAMPLES_PER_CLIENT
-        final = start+SAMPLES_PER_CLIENT
+        global datasets
+        self.image = []
+        self.label = []
 
-        self.images = []
-        self.labels = []
-
-        for i in range(start,final):
-            self.images.append(self.dataset[i][0])
-            self.labels.append(self.dataset[i][1])
-
-        self.images = torch.stack (self.images)
-        self.labels = torch.tensor(self.labels)
+        for i in range(index*SAMPLE_LEN,(index+1)*SAMPLE_LEN):
+            self.image.append(datasets[i][0])
+            self.label.append(datasets[i][1])
     
     def __len__(self):
-        return len(self.images)
+        return len(self.image)
     
-    def __getitem__(self,index):
-        return self.images[index],self.labels[index]
+    def __getitem__(self, index):
+        return self.image[index],self.label[index]
 
 class Client():
 
     def __init__(self,index):
 
-        ## Cannot exceed total client instance
-        assert index < COUNT_CLIENT
+        self.Dnet = Critic()
+        self.Anet = Classifier()
+        self.Dnet.to(DEVICE)
+        self.Anet.to(DEVICE)
 
-        self.Dnet = Discriminator().to(DEVICE)
-        self.Anet = Auxillary().to(DEVICE)
+        self.datasets = CustomMNISTDataset(index)
 
-        weight_initialization(self.Dnet)
-        weight_initialization(self.Anet)
+        self.Doptim = RMSprop(
+            lr=LEARNING_RATE,
+            params=self.Dnet.parameters()
+        )
 
-        self.bcloss = BCELoss()
-        self.celoss = CrossEntropyLoss()
+        self.Aoptim = RMSprop(
+            lr=LEARNING_RATE,
+            params=self.Anet.parameters()
+        )
 
-        self.Doptim = Adam(self.Dnet.parameters(),
-                      LEARNING_RATE,(0.50,0.999))
-        self.Aoptim = Adam(self.Anet.parameters(),
-                      LEARNING_RATE,(0.50,0.999))
-
-        self.datasets = CustomMNIST(index) ## transformed image and label
-        self.STD = 1.2
-    
-    def train(self,start,flag=False):
+    def train(self,index,flag=False):
         
+        '''
+        index: defines the batch
+        of samples used to train
+        critic & classifier nets
+        '''
+
         image = []
         label = []
-        for i in range(start*BATCH_SIZE,(start+1)*BATCH_SIZE):
-            image.append(self.datasets.images[i])
-            label.append(self.datasets.labels[i])
-        
-        image = torch.stack (image).to(DEVICE)
-        label = torch.tensor(label).to(DEVICE)
-        
-        self.Doptim.zero_grad()
-        self.Aoptim.zero_grad()
 
-        real_logit = self.Dnet(image)
+        for i in range(index*BATCH_SIZE,(index+1)*BATCH_SIZE):
+            image.append(self.datasets[i][0])
+            label.append(self.datasets[i][1])
         
-        Dloss = self.bcloss(
-                real_logit,
-                torch.ones_like(real_logit)
-                )
-        
+        ## BATCH
+        image = torch.stack (image)
+        label = torch.tensor(label)
+
+        self.Doptim.zero_grad()
+        image = image.to(DEVICE)
+        label = label.to(DEVICE)
+
+        Dloss = -self.Dnet(image).mean()
         Dloss.backward()
 
-        real_gradients = []
+        real_grad = []
         for param in self.Dnet.parameters():
-            p = param.grad.detach().clone()
-            real_gradients.append(p)
-
+            x = param.grad.detach().clone()
+            real_grad.append(x)
+        
         if flag:
+
+            self.Aoptim.zero_grad()
             preds = self.Anet(image)
-            Aloss = self.celoss(preds,label)
+            Aloss = CrossEntropyLoss()(preds,label)
             Aloss.backward()
             self.Aoptim.step()
         
-        return real_gradients ## NO LABELS SHARED
-    
+        return real_grad
+
     def eval(self):
-        
-        self.Anet.eval()
-        start = torch.randint(0,150,(1,))[0]
-        
+
+        index = torch.randint(0,10,(1,))
+        index = index.item()
+
         image = []
         label = []
-        for i in range(start*BATCH_SIZE,(start+1)*BATCH_SIZE):
-            image.append(self.datasets.images[i])
-            label.append(self.datasets.labels[i])
-        
-        image = torch.stack (image).to(DEVICE)
-        label = torch.tensor(label).to(DEVICE)
 
+        for i in range(index*BATCH_SIZE,(index+1)*BATCH_SIZE):
+            image.append(self.datasets[i][0])
+            label.append(self.datasets[i][1])
+        
+        ## BATCH
+        image = torch.stack (image)
+        label = torch.tensor(label)
+        
+        self.Anet.eval()
+        image = image.to(DEVICE)
+        label = label.to(DEVICE)
         preds = self.Anet(image)
-        accuracy = (torch.argmax(preds,dim=1)==label).sum() / BATCH_SIZE
-        print(f"Accuracy: {accuracy*100:.2f}%")
+
+        right_pred = (torch.argmax(preds,dim=1)==label).sum()
+        return right_pred/BATCH_SIZE
     
-    def weight_attack(self):
+    def weight_attack(self,scalar):
 
         with torch.no_grad():
-            for param in self.Dnet.parameters(): ## std. normal gaussian
-                param.add_(torch.randn_like(param)*self.STD)
+            for param in self.Dnet.parameters():
+                param.add_(torch.randn_like(param)*scalar)
             for param in self.Anet.parameters():
-                param.add_(torch.randn_like(param)*self.STD)
-
+                param.add_(torch.randn_like(param)*scalar)
+    
     def gradient_attack(self):
-        posionous_grads = []
+        p_grad = []
 
         with torch.no_grad():
-            for param in self.Dnet.parameters(): ## std. noraml gaussian
-                param.grad = torch.randn_like(param.grad)* self.STD
-                posionous_grads.append(param.grad.detach().clone())
+            for param in self.Dnet.parameters(): ##  Gaussian
+                param.grad = torch.randn_like(param.grad)
+                p_grad.append(param.grad.detach().clone())
         
-        return posionous_grads
+        return p_grad

@@ -1,9 +1,7 @@
 ## Outlier-robust Federated Learning setup: For
 ## each batch sample client grads and implement
 ## KRUM. You will have a trusted gradient, with
-## high probability of being benign. Assumption
-## initially we have 1 (or a subset of) trusted
-## clients. The GAN forces Generator to produce
+## high probability of being benign. GAN forces
 ## similar distribution. Classifier forces them
 ## to be correct labels.
 
@@ -23,155 +21,152 @@ def aggregate(weights):
     num = len(weights)
     return {k: sum(w[k] for w in weights)/num for k in weights[0].keys()}
 
+def krum(gradient):
+    ## Apply KRUM
+    dist_mat = torch.zeros(COUNT_CLIENT,COUNT_CLIENT)
+    for c1 in range(COUNT_CLIENT):
+
+        for c2 in range(COUNT_CLIENT):
+            
+            total = 0
+            for x,y in zip(gradient[c1],gradient[c2]):
+                total += (x-y).norm(p=2)
+            
+            dist_mat[c1,c2] = total
+            dist_mat[c2,c1] = total
+    
+    score = []
+    for c3 in range(COUNT_CLIENT):
+        dist = torch.sort(dist_mat[c3,:])[0]
+        score.append(torch.sum(dist[:COUNT_CLIENT-MAX_BYZANTINE]))
+    
+    return torch.tensor(score)
+
+server  = Server()
 clients = []
-for i  in range(COUNT_CLIENT):
+
+for i in  range(COUNT_CLIENT):
     clients.append(Client(i))
 
-server = Server()
-
-## Assume that client '0' is the trusted client
 stable = clients[0]
 stable.Anet.train()
-for i in range(300):
-
+for i in range(150):
     stable.train(i,True)
 
-print("INITIAL TRAINING")
 for epoch in tqdm(range(EPOCH)):
-
     server.Dnet.train()
     server.Gnet.train()
     stable.Dnet.train()
-    stable.Anet.train()
+    for i in range(150):
 
-    for i in range(300):
+        for _ in range(CRITIC_ITER):
 
-        stable.Dnet.load_state_dict(server.Dnet.state_dict()) ## EQUAL θs
-        real_gradients = stable.train(i)
-        server.train(real_gradients,stable.Anet)
-
-TEMP = Client(0)
-for client in clients:
-    client.Anet.load_state_dict(TEMP.Anet.state_dict())
+            stable.Dnet.load_state_dict(server.Dnet.state_dict())
+            real_grad = stable.train(i)
+            
+            server.train(stable.Anet,
+                real_grad,flag=False
+            )
+        
+        server.train(stable.Anet,[],flag=True)
 
 for _ in range(ROUNDS):
 
-    print("GENERATOR OUTPUT")
-    sample = 64
+    weights = []
 
-    noise = torch.randn(sample,NOISE)
+    noise = torch.randn(BATCH_SIZE,100)
     label = torch.randint(0,10,(64,))
-
+    
     noise = noise.to(DEVICE)
     label = label.to(DEVICE)
-    fakes = server.Gnet(noise, label)
+    fakes = server.Gnet(noise,label)
 
-    byzantine = []
-
-    if MAX_BYZANTINE != 0:
-        num = torch.randint(1,MAX_BYZANTINE+1,(1,)).item()
-        byzantine = torch.randperm(COUNT_CLIENT)[:num]
+    byzantines = torch.randperm(COUNT_CLIENT)[:MAX_BYZANTINE + 0]
 
     for j,client in enumerate(clients):
 
-        if j in byzantine:
+        if j in byzantines:
 
             print(f"Client @ {j}")
             print("POISONED")
-            client.train(0)
-            client.weight_attack()
-        
+            client.train(0,True)
+            client.weight_attack(scalar=1.5)
+
         else:
 
             print(f"Client @ {j}")
             print("TRAINING")
 
             client.Anet.train()
-            for i in range(300):
+            for i in range(150):
                 client.train(i,True)
-
-        client.eval()
-
+        
+            accuracy = client.eval()
+            print(f"Accuracy: {accuracy*100 :.2f}%")
+    
+    benign = None
     malicious = []
     for j,client in enumerate(clients):
 
-        client.Anet.eval()
-        preds = \
-        client.Anet(fakes)
+        preds = client.Anet(fakes)
+        preds = preds.argmax(dim=1)
+        accuracy = (preds==label).sum() / BATCH_SIZE
 
-        accuracy = (torch.argmax(preds,dim=1)==label).sum()/float(sample)
         if accuracy < THRESHOLD:
             malicious.append(j)
+
+        else:
+            benign = j
+            
+            weights.append(
+                client.Anet.state_dict()
+            )
     
     print("MALICIOUS CLIENTS")
     print(malicious)
-    print("FEDERATED AVERAGE")
-
-    weights = []
-    for j,client in enumerate(clients):
-
-        if j not in malicious:
-            weights.append(client.Anet.state_dict())
-    avg_weights = aggregate(weights)
-
-    ## FEDERATED-AVERAGING - aggregates  weights
-    ## and loads back to the clients' classifier
-    ## This is applied to : malicious and benign
-    for client in clients:
-        client.Anet.load_state_dict(avg_weights)
     
-    server.test_global_classifier(clients[0].Anet)
+    average_weights = aggregate(weights)
 
+    for client in clients:
+        client.Anet.load_state_dict(average_weights)
+    
     for epoch in tqdm(range(EPOCH)):
+        server.Dnet.train()
+        server.Gnet.train()
 
-        for i in range(300):
-            batch_grad = []
+        for i in range(150):
 
-            for j,client in enumerate(clients):
+            ## For each batch, get the
+            ## gradients from from all
+            ## clients, and apply KRUM
+            ## to get the most 'likely'
+            ## gradient.
 
-                if j in byzantine:
+            for _ in range(CRITIC_ITER):
+                trust = None
+                gradient = []
 
-                    batch_grad.append(client.gradient_attack())
-
-                else:
-                    client.Dnet.train()
+                for j,client in enumerate(clients):
                     client.Anet.train()
-                    server.Dnet.train()
-                    server.Gnet.train()
+                    client.Dnet.train()
 
-                    client.Dnet.load_state_dict(server.Dnet.state_dict())
-                    batch_grad.append(client.train(i))
-            
-            ## KRUM: compute euclidean distance
-            ## between each pair Sum to closest
-            ## N-F distances and select the one
-            ## with smallest value The selected
-            ## gradient is the most "similar".
-
-            dist = torch.zeros(COUNT_CLIENT,COUNT_CLIENT)
-
-            for c1 in range(COUNT_CLIENT):
-
-                for c2 in range(COUNT_CLIENT):
-
-                    add = 0
-                    for dist1,dist2 in zip(batch_grad[c1],batch_grad[c2]):
-                        add += (dist1-dist2).norm(p=2)
+                    if j in malicious:
+                        gradient.append(client.gradient_attack())
                     
-                    dist[c1,c2] = add
-                    dist[c2,c1] = add
-            
-            score = []
-            for c3 in range(COUNT_CLIENT):
+                    else:
 
-                sorted_dist = torch.sort(dist[c3,:])[0]
-                score.append(
-                    torch.sum(sorted_dist[:COUNT_CLIENT - MAX_BYZANTINE])
-                )
+                        client.Dnet.load_state_dict(
+                            server.Dnet.state_dict()
+                        )
+                        gradient.append(client.train(i))
 
-            score = torch.tensor(score)
-            trust = torch.argmin(score)
+                score = krum(gradient)
+                trust = torch.argmin(score)
+
+                server.train(clients[benign].Anet,gradient[trust],
+                             flag=False)
             
-            ## all classifiers have same weight
-            server.train(batch_grad[trust],
-                         clients[0].Anet)
+            server.train(
+                clients[benign].Anet,
+                gradient[trust],True
+            )

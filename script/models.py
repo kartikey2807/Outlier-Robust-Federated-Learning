@@ -1,106 +1,106 @@
-## GAN: comprises of Discriminator and Generator
-## network. Discriminator is a binary classifier
-## and tries to differentiate between a real and
-## fake image. Generator take in noise (and also
-## labels in our case) to produce good fakes The
-## equations are:
-
-## D_loss = log[D(x)] + log[1-D(G(z|y*))]
-## G_loss = log[D(G(z|y*))] + y*.log[H(G(z|y*))]
-## where 
-## y* <- random labels (not real)
-## H(.) <- pre-trained classifier
+## Wasserstein GAN models with DP-GAN setup.
+## 1-Lipschitz constraint is satisfoed with
+## weight clipping. Classifier is simple NN
+## that predicts the label class, given the
+## image. The generator is conditioned with
+## the label to support targeted generation
 
 import torch
 import torch.nn as nn
+from torchsummary import summary
+
+## no. channels in MNIST?
+IN = 1
+
+class Classifier(nn.Module):
+    def __init__(self):
+        super().__init__()
+
+        self.conv1 = self.blocks(IN,16)
+        self.conv2 = self.blocks(16,32)
+        self.conv3 = self.blocks(32,64)
+
+        self.fc1_1 = nn.Sequential(
+            nn.Flatten(),
+            nn.Linear(4*4*64,10),
+        )
+
+    def blocks(self,i,o):
+        return nn.Sequential(nn.Conv2d(i,o,4,2,1),
+               nn.LeakyReLU(0.2))
+
+    def forward(self,image):
+
+        input = self.conv1(image)
+        input = self.conv2(input)
+        input = self.conv3(input)
+        input = self.fc1_1(input)
+        return input
+
+class Critic(nn.Module):
+
+    def __init__(self):
+        super().__init__()
+        self.conv1 = self.blocks(IN,16)
+        self.conv2 = self.blocks(16,32)
+        self.conv3 = self.blocks(32,64)
+
+        self.fc1_1 = nn.Sequential(
+            nn.Flatten(),
+            nn.Linear(4*4*64,100),
+            nn.LeakyReLU(0.2),
+            nn.Linear(100,1)
+        )
+
+    def blocks(self,i,o):
+        return nn.Sequential(nn.Conv2d(i,o,4,2,1),
+               nn.LeakyReLU(0.2))
+
+    def forward(self,image):
+
+        input = self.conv1(image)
+        input = self.conv2(input)
+        input = self.conv3(input)
+        input = self.fc1_1(input)
+        return input
 
 class Generator(nn.Module):
+
     def __init__(self):
         super().__init__()
 
-        self.fc1_1 = self.linear(100,256)
-        self.fc1_2 = self.linear(10 ,256)
-        self.fc2_1 = self.linear(512,512)
-        self.fc3_1 = self.linear(512,1024)
-        self.fc4_1 = self.linear(1024,784,last=True)
-
-        self.embed = nn.Embedding(10,10)
+        self.embed = nn.Embedding(10,100)
+        self.fc1_1 = nn.Sequential(
+            nn.Linear(200, 4*4*64),
+            nn.BatchNorm1d(4*4*64),
+            nn.ReLU()
+        )
+        self.conv1 = self.blocks(64,32)
+        self.conv2 = self.blocks(32,16)
+        self.conv3 = self.blocks(16,IN,last=True)
     
-    def linear(self,i,o,last=False):
+    def blocks(self,i,o,last=False):
         if last:
             return nn.Sequential(
-                nn.Linear(i,o),
-                nn.Tanh())
+                   nn.ConvTranspose2d(i,o,4,2,1),
+                   nn.Tanh())
         else:
             return nn.Sequential(
-                nn.Linear(i,o),
-                nn.BatchNorm1d(o),
-                nn.ReLU())
+                   nn.ConvTranspose2d(i,o,4,2,1),
+                   nn.BatchNorm2d(o), nn.ReLU())
     
-    def forward(self,z,y):
-        y_embed = self.embed(y)
+    def forward(self,noise,label):
 
-        input = torch.cat([
-            self.fc1_1(z),
-            self.fc1_2(y_embed)
-            ],dim = 1)
+        input = torch.cat([noise,self.embed(label)],dim=1)
+        input = self.fc1_1(input)
         
-        input = self.fc2_1(input)
-        input = self.fc3_1(input)
-        input = self.fc4_1(input)
-
-        input = input.view(-1,1,28,28)
+        input = input.view(-1,64,4,4)
+        input = self.conv1(input)
+        input = self.conv2(input)
+        input = self.conv3(input)
         return input
 
-class Discriminator(nn.Module):
-    def __init__(self):
-        super().__init__()
-
-        self.fc1_1 = self.linear(784,1024)
-        self.fc2_1 = self.linear(1024,512)
-        self.fc3_1 = self.linear(512, 256)
-
-        self.fc4_1 = nn.Sequential(
-            nn.Linear(256,1),
-            nn.Sigmoid())
-
-    def linear(self,i,o):
-        return nn.Sequential(
-            nn.Linear(i,o),
-            nn.LeakyReLU(0.2))
-
-    def forward(self,x):
-
-        input = self.fc1_1(x.view(-1,784))
-        input = self.fc2_1(input)
-        input = self.fc3_1(input)
-        input = self.fc4_1(input)
-
-        return input
-
-class Auxillary(nn.Module):
-    def __init__(self):
-        super().__init__()
-
-        self.fc1_1 = self.linear(784,1024)
-        self.fc2_1 = self.linear(1024,512)
-        self.fc3_1 = self.linear(512, 256)
-        self.fc4_1 = nn.Linear(256,10)
-    
-    def linear(self,i,o):
-        return nn.Sequential(
-            nn.Linear(i,o),
-            nn.LeakyReLU(0.2))
-    
-    def forward(self,x):
-        input = self.fc1_1(x.view(-1,784))
-        input = self.fc2_1(input)
-        input = self.fc3_1(input)
-        input = self.fc4_1(input)
-
-        return input
-
-def weight_initialization(model):
-    for m in model.modules():
-        if isinstance(m,(nn.Linear,nn.BatchNorm1d)):
-            nn.init.normal_(m.weight.data,0.0,0.02)
+def weight_init(model):
+    for param in model.modules():
+        if isinstance(param,(nn.Linear,nn.Conv2d,nn.ConvTranspose2d)):
+            nn.init.normal_(param.weight.data,0.0,0.02)

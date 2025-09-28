@@ -1,95 +1,114 @@
-## Server receives real discriminator gradients
-## and trained classifer. No real images/labels
-## are shared. It randomly samples labels, pass
-## through Generator and computes discriminator
-## loss log[1-D(G(z|y*))]. Additionally G(z|y*)
-## are passed to classifier, and computes cross
-## entropy loss.
+## Server receives real loss gradients -del f(x)
+## and samples noise and labels, passing through
+## generator G(z|y*), and then critic f(G(z|y*))
+## Critic is updated 5 times, for each generator
+## update. Weight clipping is also applied. Test
+## the global classifier accuracy.
 
 from script.models import *
 from config import *
 from clients import transform
 
-import numpy as np
 import torch
 import torch.nn as nn
 import matplotlib.pyplot as plt
 
-from torch.optim import Adam
-from torch.nn import BCELoss, CrossEntropyLoss
+from torch.optim import RMSprop
 
+from torch.utils.data import DataLoader,Dataset
 from torchvision.datasets import MNIST
-from torch.utils.data import DataLoader
-from torchvision.transforms import transforms
+from torch.nn import CrossEntropyLoss
 
 class Server():
+
     def __init__(self):
 
-        ## define models
-        ## define loss
-        ## define optimizers
-        ## initialize weights
-
-        self.Dnet = Discriminator().to(DEVICE)
-        self.Gnet = Generator().to(DEVICE)
-
-        weight_initialization(self.Dnet)
-        weight_initialization(self.Gnet)
-
-        self.bcloss = BCELoss()
         self.celoss = CrossEntropyLoss()
 
-        self.Goptim = Adam(self.Gnet.parameters(),
-                      LEARNING_RATE,(0.50,0.999))
-        self.Doptim = Adam(self.Dnet.parameters(),
-                      LEARNING_RATE,(0.50,0.999))
+        self.Dnet = Critic()
+        self.Gnet = Generator()
+        self.Dnet.to(DEVICE)
+        self.Gnet.to(DEVICE)
+
+        self.test = MNIST(
+            ROOT,
+            train=False,
+            transform=transform,
+            download=True
+        )
+
+        self.Doptim = RMSprop(
+            lr=LEARNING_RATE,
+            params=self.Dnet.parameters()
+        )
+
+        self.Goptim = RMSprop(
+            lr=LEARNING_RATE,
+            params=self.Gnet.parameters()
+        )
+
+        weight_init(self.Dnet)
+        weight_init(self.Gnet)
+    
+    def train(self,classifier,real_grad,flag):
         
-        self.datasets = MNIST("MNIST/dataset",
-                             train=False,
-                             transform=transform,
-                             download=True)
-        
-        self.dataload = DataLoader(self.datasets,10000)
-
-    def train(self,real_gradients,classifier):
-
-        self.Doptim.zero_grad()
-        self.Goptim.zero_grad()
-
         classifier.to(DEVICE)
-
-        for param,real_grad in zip(self.Dnet.parameters(),real_gradients):
-            param.grad = real_grad.to(DEVICE)
-
-        noise = torch.randn(BATCH_SIZE,NOISE)
-        label = torch.randint(0,LABEL, (32,))
+        
+        noise = torch.randn(BATCH_SIZE,100)
+        label = torch.randint(0,10,(BATCH_SIZE,))
         noise = noise.to(DEVICE)
         label = label.to(DEVICE)
-
         fakes = self.Gnet(noise,label)
-        fake_logit = self.Dnet(fakes)
 
-        Dloss = self.bcloss(fake_logit,torch.zeros_like(fake_logit))
+        if flag == False:
+            '''
+            If flag is true, generator
+            weights gets updated. Else
+            discriminator weights gets
+            updated.
+            '''
 
-        Dloss.backward(retain_graph=True)
-        self.Doptim.step()
+            self.Doptim.zero_grad()
 
-        fake_logit = self.Dnet(fakes)
+            for param,real_g in zip(self.Dnet.parameters(),real_grad):
+                param.grad = real_g.to(DEVICE)
 
-        Gloss = self.bcloss(fake_logit,torch.ones_like (fake_logit)) + \
-                self.celoss(classifier(fakes),label)
-        
-        Gloss.backward(retain_graph=True)
-        self.Goptim.step()
+            Dloss = self.Dnet(fakes).mean()
+            Dloss.backward()
+            self.Doptim.step()
+
+            for param in self.Dnet.parameters():
+                param.data.clamp_(-CLIP,CLIP)
+        else:
+            
+            self.Goptim.zero_grad()
+            
+            '''
+            Add classifier loss to the
+            generator loss to targeted
+            sampling for MNIST samples
+            '''
+            preds = classifier(fakes)
+            Aloss = self.celoss(preds,label)
+            Gloss = -self.Dnet(fakes).mean()
+            overall_loss_val = Gloss + Aloss
+           
+            overall_loss_val.backward()
+            self.Goptim.step()
     
     def test_global_classifier(self,classifier):
         
+        classifier.to(DEVICE)
         classifier.eval()
-        image,label = next(iter(self.dataload))
 
+        loader = DataLoader(
+            self.test,
+            batch_size=10_000
+        )
+        image,label = next(iter(loader))
         image = image.to(DEVICE)
         label = label.to(DEVICE)
-        preds = classifier(image)
 
+        preds = classifier(image)
         accuracy = (torch.argmax(preds,dim=1)==label).sum() / 10_000
-        print(f"Global model accuracy: {accuracy*100:.2f}%")
+        return accuracy
