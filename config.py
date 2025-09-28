@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 
-MAX_BYZANTINE = 3
+MAX_BYZANTINE = 0
 COUNT_CLIENT  = 6
 SAMPLE_LEN = 10000
 ROOT = 'MNIST/dataset'
