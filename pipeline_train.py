@@ -130,6 +130,14 @@ for _ in range(ROUNDS):
     for client in clients:
         client.Anet.load_state_dict(average_weights)
     
+    ## New classifier accuracy
+    ## after Federated average
+    classifier = clients[0].Anet
+    accuracy = server.test_global_classifier(
+        classifier=classifier
+    )
+
+    print(f"Accuracy: {accuracy*100:.2f}%")
     for epoch in tqdm(range(EPOCH)):
         server.Dnet.train()
         server.Gnet.train()
