@@ -146,7 +146,7 @@ class Client():
     def weight_attack(self,scalar):
 
         with torch.no_grad():
-            for param in self.Dnet.parameters():
+            for param in self.Dnet.parameters(): ## Gaussian
                 param.add_(torch.randn_like(param)*scalar)
             for param in self.Anet.parameters():
                 param.add_(torch.randn_like(param)*scalar)
@@ -155,7 +155,7 @@ class Client():
         p_grad = []
 
         with torch.no_grad():
-            for param in self.Dnet.parameters(): ##  Gaussian
+            for param in self.Dnet.parameters(): ## Guassian
                 param.grad = torch.randn_like(param.grad)
                 p_grad.append(param.grad.detach().clone())
         
