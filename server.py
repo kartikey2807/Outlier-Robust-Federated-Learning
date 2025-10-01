@@ -38,12 +38,12 @@ class Server():
         )
 
         self.Doptim = RMSprop(
-            lr=LEARNING_RATE,
+            lr=LEARNING_RATE_G,
             params=self.Dnet.parameters()
         )
 
         self.Goptim = RMSprop(
-            lr=LEARNING_RATE,
+            lr=LEARNING_RATE_G,
             params=self.Gnet.parameters()
         )
 

@@ -69,12 +69,12 @@ class Client():
         self.datasets = CustomMNISTDataset(index)
 
         self.Doptim = RMSprop(
-            lr=LEARNING_RATE,
+            lr=LEARNING_RATE_G,
             params=self.Dnet.parameters()
         )
 
         self.Aoptim = RMSprop(
-            lr=LEARNING_RATE,
+            lr=LEARNING_RATE_C,
             params=self.Anet.parameters()
         )
 
