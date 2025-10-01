@@ -71,6 +71,13 @@ for epoch in tqdm(range(EPOCH)):
         
         server.train(stable.Anet,[],flag=True)
 
+TEMP = Client(0)
+
+for client in clients:
+    client.Anet.load_state_dict(
+        TEMP.Anet.state_dict()
+    )
+
 for _ in range(ROUNDS):
 
     weights = []
