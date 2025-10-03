@@ -107,6 +107,7 @@ class Client():
         real_grad = []
         for param in self.Dnet.parameters():
             x = param.grad.detach().clone()
+            x = x + (1/BATCH_SIZE)*torch.randn_like(x)*SIGMA
             real_grad.append(x)
         
         if flag:
