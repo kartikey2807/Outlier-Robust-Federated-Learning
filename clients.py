@@ -18,7 +18,7 @@ from torchvision.transforms import transforms
 from torchvision.datasets import MNIST
 from torch.nn import CrossEntropyLoss
 from torch.utils.data import Dataset
-from torch.optim import RMSprop,Adam
+from torch.optim import RMSprop,SGD
 
 transform = transforms.Compose([
     transforms.Resize((32,32)),
@@ -74,7 +74,7 @@ class Client():
             params=self.Dnet.parameters()
         )
 
-        self.Aoptim = RMSprop(
+        self.Aoptim = SGD(
             lr=LEARNING_RATE_C,
             params=self.Anet.parameters()
         )
