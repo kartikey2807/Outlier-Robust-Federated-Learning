@@ -8,6 +8,7 @@
 from script.models import *
 from config import *
 
+import math
 import numpy as np
 import torch
 import torch.nn as nn
@@ -78,6 +79,8 @@ class Client():
             params=self.Anet.parameters()
         )
 
+        self.ce_loss = CrossEntropyLoss()
+
     def train(self,index,flag=False):
         
         '''
@@ -111,11 +114,41 @@ class Client():
             real_grad.append(x)
         
         if flag:
-
+            
+            ## taken from the paper
+            ## https://arxiv.org/pdf/1607.00133
+            NORM = 1.0
+            D = math.sqrt(2*math.log10(1.25/DELTA))/EPSILON_2
+            
             self.Aoptim.zero_grad()
-            preds = self.Anet(image)
-            Aloss = CrossEntropyLoss()(preds,label)
-            Aloss.backward()
+
+            aggregate = dict()
+            for i, param in enumerate(self.Anet.parameters()):
+                aggregate[i] = 0
+
+            for img,lab in zip(image,label):
+                img = img.unsqueeze(0)
+                lab = lab.unsqueeze(0)
+                preds = self.Anet(img)
+
+                Aloss = self.ce_loss(preds,lab)
+                Aloss.backward()
+
+                ## clip
+                j = 0
+                for param in self.Anet.parameters():
+                    x = param.grad.detach().clone()
+                    x = x/max(1.0,x.norm(p=2)/NORM)
+                    aggregate[j] += x ## takes sums
+                    j += 1
+            
+            for i, param in enumerate(self.Anet.parameters()):
+                temp = aggregate[i]
+                temp = temp + (torch.randn_like(temp)*D*NORM)
+                temp = temp/BATCH_SIZE
+
+                param.grad = temp.to(DEVICE)
+            
             self.Aoptim.step()
         
         return real_grad
