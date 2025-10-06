@@ -119,14 +119,14 @@ class Client():
             ## https://arxiv.org/pdf/1607.00133
             NORM = 1.0
             D = math.sqrt(2*math.log10(1.25/DELTA))/EPSILON_2
-            
-            self.Aoptim.zero_grad()
 
             aggregate = dict()
             for i, param in enumerate(self.Anet.parameters()):
                 aggregate[i] = 0
 
             for img,lab in zip(image,label):
+                self.Aoptim.zero_grad()
+                
                 img = img.unsqueeze(0)
                 lab = lab.unsqueeze(0)
                 preds = self.Anet(img)
