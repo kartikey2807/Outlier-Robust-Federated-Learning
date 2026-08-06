@@ -8,4 +8,12 @@ Federated Learning allows collaborative model training without sharing the under
 - The aggregated gradients are used to update the central generator and the discriminators.
 - Once trained, this generator can be used to generate synthetic data.
 
-We notice that the data generated was interpretable and resembled client dataset.
+We noticed that the data generated was interpretable and resembled the client dataset.
+
+![Setup](./images/setup.png)
+*Figure 1. One aggregation step*
+
+![Overall flow](./images/pipeline.png)
+*Figure 2. Overall federated learning along with malicious client filtration*
+
+---
