@@ -16,20 +16,30 @@ Byzantine-robust FL
 - dataset should ideally be representative of the underlying client data.
 - during an aggregation round, the clients are evaluated against the said dataset.
 - if a client's performance deviates from majority, it is likely poisoned.
-- during experiments on MNIST and CIFAR-10 data the synthetic dataset did not resemble the client distribution.
+
+`in practice`
+- during experiments on MNIST and CIFAR-10 data, the synthetic dataset did not resemble the client distribution.
 - this work tries to resolve this problem.
 
-*Given Methodology*
+Given Methodology
 - we use a distributed conditional Wasserstein GAN model.
 - one discriminator is deployed on each client.
 - there is a single generator on the server side.
-- Figure 1 describes the loss functions and how it flows.
-- on client side, discriminator computes gradients for first WGAN loss term $\nabla f(x)$.
-- on client side, classifier $H$ (typical FL) is also trained.
+- Figure 1 describes the loss functions and how they flow.
+
+*On the client side*
+- the discriminator computes gradients for the first WGAN loss term $\nabla f(x)$.
+- classifier $H$ (typical FL) is also trained.
+
+*On the server side*
 - they are robustly aggregated using KRUM to select gradients closest to the *majority* $\nabla \hat{f}(x)$
-- instead of discarding the useful information from the trained client models we discard discriminator gradients.
+- instead of discarding the useful information from the trained client models, we discard discriminator gradients.
 - we then generate a sample from the conditional generator $G(z|y)$.
 - we compute the second WGAN loss term and aggregated classifier output.
+
+$$
+\nabla -f(G(z|y)) - c.\log[G(z|y)]
+$$
 
 <img src="./images/setup.png" width="600px">
 
